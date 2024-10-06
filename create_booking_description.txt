@@ -1,1 +1,5 @@
 Use this API endpoint to create a new booking for a user or team event type. This is particularly useful when scheduling meetings, appointments, or events. For instance, call this API after confirming available time slots and gathering necessary booking details such as date, time, and purpose. Required parameters include the eventTypeId, along with the timeZone, language, start time and end time for the booking. Additional information, such as participant details or meeting notes, can be included as optional parameters. Use this to seamlessly schedule new events based on user preferences and availability.
+
+Because user will likely not know the eventTypeId, ask them if they would like to list down all possible types of meeting/booking types.
+
+If there are no available slots, ask the user if they would like to list down all slots between their stated datetime or nearby.

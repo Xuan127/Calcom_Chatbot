@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from enum import Enum
 import requests
+import os
 
 calcom_api_key = "cal_live_767d038da060f887e1d230a9031e6412"
 
@@ -113,19 +114,30 @@ def call_cancel_booking(arguments):
     response = requests.delete(api_url, headers=headers, json=payload)
     return response
 
+def call_find_all_event_types(arguments):
+    api_url = "https://api.cal.com/v1/event-types?apiKey=" + calcom_api_key
+    if arguments.slug: api_url += '&slug=' + arguments.slug
+
+    payload = {}
+    headers = {}
+
+    # Send the GET request
+    response = requests.get(api_url, headers=headers, json=payload)
+    return response
+
 def api_response_to_agent(response):
     # Check and print the response
     if response.status_code == 200:
         st.session_state.messages.append({
             "role": "system", 
             "content": "The API call was successful, here is the response, \
-                present it to the user in a easy to understand way" + json.dumps(response.json())
+                present it to the user in a easy to understand way\n" + json.dumps(response.json())
         })
     else:
         st.session_state.messages.append({
             "role": "system", 
             "content": "The API call was unsuccessful, here is the error code and message, \
-                present it to the user in a easy to understand way" 
+                present it to the user in a easy to understand way\n" 
                 + str(response.status_code) + response.text
         })
     completion = client.beta.chat.completions.parse(
@@ -195,6 +207,9 @@ class Cancel_existing_booking(BaseModel):
     cancellationReason: Optional[int]
     id: int
 
+class Find_all_event_types(BaseModel):
+    slug: Optional[str]
+
 # tools to be passed into the module
 tools = []
 tools.append(openai.pydantic_function_tool(Get_available_slots))
@@ -203,6 +218,7 @@ tools.append(openai.pydantic_function_tool(Find_a_existing_booking))
 tools.append(openai.pydantic_function_tool(Create_new_booking))
 tools.append(openai.pydantic_function_tool(Edit_existing_booking))
 tools.append(openai.pydantic_function_tool(Cancel_existing_booking))
+tools.append(openai.pydantic_function_tool(Find_all_event_types))
 
 # include descriptions in the tools
 get_slots_description = Path('get_slots_description.txt').read_text(encoding='utf-8')
@@ -242,10 +258,17 @@ cancel_booking_description = Path('cancel_booking_description.txt').read_text(en
 tools[5]['function']['description'] = cancel_booking_description
 tools[5]['function']['parameters']['properties']['id']['description'] = "ID of the specific booking that the user is looking for"
 
+find_all_event_types_description = Path('find_event_types_description.txt').read_text(encoding='utf-8')
+tools[6]['function']['description'] = find_all_event_types_description
+tools[6]['function']['parameters']['properties']['slug']['description'] = "Slug of the event type that the user is looking for, this is optional"
+
 # json_formatted_str = json.dumps(tools, indent=2)
 # print(json_formatted_str)
 
 st.title("💬 Cal.com Assistant Chatbot")
+openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
+if os.environ.get('OPENAI_API_KEY'):
+    openai_api_key = os.environ.get('OPENAI_API_KEY')
 
 if "messages" not in st.session_state:
     system_prompt = Path('system_prompt.txt').read_text(encoding='utf-8')
@@ -255,6 +278,8 @@ if "messages" not in st.session_state:
         Let me know what I can do for you!"}]
 
 for msg in st.session_state.messages:
+    if msg["role"] == "system":
+        pass
     st.chat_message(msg["role"]).write(msg["content"])
 
 if prompt := st.chat_input():
@@ -263,7 +288,7 @@ if prompt := st.chat_input():
 
     we_did_not_specify_stop_tokens = True
     try:
-        client = OpenAI()
+        client = OpenAI(api_key=openai_api_key)
         completion = client.beta.chat.completions.parse(
             model="gpt-4o-2024-08-06",
             messages=st.session_state.messages,
@@ -296,6 +321,8 @@ if prompt := st.chat_input():
                 r = call_edit_booking(response.tool_calls[0].function.parsed_arguments)
             if func_to_call == 'Cancel_existing_booking':
                 r = call_cancel_booking(response.tool_calls[0].function.parsed_arguments)
+            if func_to_call == 'Find_all_event_types':
+                r = call_find_all_event_types(response.tool_calls[0].function.parsed_arguments)
             api_response_to_agent(r)
         elif finish_reason == "stop":
             # In this case the model has either successfully finished generating the JSON object according to your schema, 
