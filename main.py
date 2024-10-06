@@ -275,7 +275,8 @@ if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
     st.session_state["messages"] = [{"role": "assistant", "content": "I am your Cal.com Assistant! \
         I can help with you listing, creating, editing and cancelling bookings. \
-        Let me know what I can do for you!"}]
+        Let me know what I can do for you!\
+        \nTo begin, enter your OpenAI API key in the sidebar. You can skip this step if you have set the OPENAI_API_KEY environment variable."}]
 
 for msg in st.session_state.messages:
     if msg["role"] == "system":
@@ -283,6 +284,8 @@ for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
 if prompt := st.chat_input():
+    if not openai_api_key:
+        st.chat_message("System").write("PLEASE ENTER YOUR OPENAI AI KEY")
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
 
